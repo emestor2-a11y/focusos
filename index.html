@@ -34,6 +34,8 @@
             <option value="Информатика">Информатика</option>
             <option value="Физика">Физика</option>
           </select>
+          <input id="custom-subject" class="custom-subject" type="text" maxlength="40" placeholder="Или введи своё направление…" aria-label="Своё направление">
+          <button class="text-button add-subject-btn" id="add-subject-btn" type="button">Добавить тему</button>
           <div class="subject-hint"><span class="dot"></span><span id="subject-hint">Выбери предмет и начинай сессию</span></div>
         </section>
 
@@ -61,6 +63,24 @@
         </section>
       </section>
 
+      <section class="page" id="rating-page">
+        <p class="eyebrow">СОРЕВНУЙСЯ В СВОЁМ</p>
+        <h1>Рейтинг</h1>
+        <section class="panel">
+          <div class="section-title"><h2>Направление</h2><span class="muted">общие темы</span></div>
+          <select id="leaderboard-topic" aria-label="Тема рейтинга"><option value="">Общий рейтинг</option></select>
+          <div class="section-title" style="margin-top:14px"><h2>Период</h2></div>
+          <select id="leaderboard-period" aria-label="Период рейтинга">
+            <option value="week">Последние 7 дней</option>
+            <option value="today">Сегодня</option>
+            <option value="month">Последние 30 дней</option>
+            <option value="all">Всё время</option>
+          </select>
+        </section>
+        <section class="panel"><div id="leaderboard-list" class="history-list"><div class="empty-state">Открой приложение через Telegram, чтобы загрузить рейтинг.</div></div></section>
+        <p class="small-note">В рейтинг попадает время завершённых сессий. Используй одинаковые названия тем, чтобы сравнивать результаты.</p>
+      </section>
+
       <section class="page" id="stats-page">
         <p class="eyebrow">НЕ НА ОЩУЩЕНИЯХ — НА ДАННЫХ</p>
         <h1>Статистика</h1>
@@ -86,6 +106,7 @@
     <nav class="bottom-nav">
       <button class="nav-item selected" data-page="focus-page"><span>◎</span><small>Фокус</small></button>
       <button class="nav-item" data-page="stats-page"><span>▥</span><small>Статистика</small></button>
+      <button class="nav-item" data-page="rating-page"><span>♜</span><small>Рейтинг</small></button>
     </nav>
   </div>
   <script src="app.js"></script>

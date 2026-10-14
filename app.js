@@ -1,5 +1,7 @@
 (() => {
-  const SUBJECTS = ["Математика", "Русский язык", "Информатика", "Физика"];
+  const DEFAULT_SUBJECTS = ["Математика", "Русский язык", "Информатика", "Физика"];
+  let SUBJECTS = [...DEFAULT_SUBJECTS];
+  const API_BASE = "https://focusos-api-pugl.onrender.com";
   const STORAGE_KEY = "focusos-ege-sessions-v1";
   const $ = id => document.getElementById(id);
   const tg = window.Telegram?.WebApp;
@@ -7,7 +9,56 @@
   tg?.expand();
 
   let sessions = loadSessions();
+  for (const s of sessions) if (s.subject && !DEFAULT_SUBJECTS.includes(s.subject)) SUBJECTS.push(s.subject);
   let startedAt = null;
+  const initData = tg?.initData || "";
+  const authHeaders = () => initData ? { "Authorization": `tma ${initData}`, "Content-Type": "application/json" } : null;
+  async function api(path, options = {}) {
+    const headers = authHeaders();
+    if (!headers || API_BASE.includes("YOUR-RENDER-SERVICE")) return null;
+    try {
+      const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } });
+      if (!response.ok) throw new Error(`API ${response.status}`);
+      return await response.json();
+    } catch (error) { console.warn("FocusOS API:", error); return null; }
+  }
+  async function syncFromServer() {
+    const data = await api("/api/stats");
+    if (data?.sessions) {
+      sessions = data.sessions.map(s => ({ subject: s.subject, seconds: Number(s.seconds), startedAt: s.started_at, endedAt: s.ended_at }));
+      persist(); render();
+    }
+    await loadLeaderboardTopics();
+  }
+  async function loadLeaderboardTopics() {
+    const data = await api("/api/topics");
+    if (data?.topics) {
+      const topicSelect = $("leaderboard-topic");
+      const selected = topicSelect.value;
+      topicSelect.innerHTML = '<option value="">Общий рейтинг</option>' + data.topics.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+      topicSelect.value = selected;
+    }
+    await renderLeaderboard();
+  }
+  async function renderLeaderboard() {
+    const topic = $("leaderboard-topic")?.value || "";
+    const period = $("leaderboard-period")?.value || "week";
+    const query = new URLSearchParams({ period });
+    if (topic) query.set("topic", topic);
+    const data = await api(`/api/leaderboard?${query.toString()}`);
+    const root = $("leaderboard-list");
+    if (!root) return;
+    if (!data?.leaderboard) {
+      root.innerHTML = '<div class="empty-state">Рейтинг загрузится, когда приложение будет подключено к API и появятся завершённые сессии.</div>';
+      return;
+    }
+    if (!data.leaderboard.length) {
+      root.innerHTML = '<div class="empty-state">Пока нет результатов в этом рейтинге. Начни сессию и используй такое же название темы, как другие участники.</div>';
+      return;
+    }
+    root.innerHTML = data.leaderboard.map((p, i) => `<div class="rank-row"><div class="rank-number">${i + 1}</div><div class="rank-info"><div class="rank-name">${escapeHtml(p.name || "Участник")}</div><div class="rank-topic">${escapeHtml(topic || "Все направления")}</div></div><div class="rank-time">${fmtDuration(Number(p.seconds || 0))}</div></div>`).join("");
+  }
+
   let ticker = null;
 
   function loadSessions() {
@@ -104,6 +155,11 @@
     const endedAt = new Date().toISOString();
     if (seconds > 0) sessions.push({subject:$("subject-select").value, seconds, startedAt:new Date(startedAt).toISOString(), endedAt});
     persist();
+    if (seconds > 0) {
+      const last = sessions[sessions.length - 1];
+      api("/api/sessions", { method: "POST", body: JSON.stringify({ subject: last.subject, seconds: last.seconds, started_at: last.startedAt, ended_at: last.endedAt }) })
+        .then(result => { if (result?.ok) syncFromServer(); });
+    }
     clearInterval(ticker); ticker = null; startedAt = null;
     $("timer-display").textContent = "00:00:00";
     $("subject-select").disabled = false;
@@ -117,6 +173,22 @@
     tg?.HapticFeedback?.notificationOccurred("success");
   }
 
+  $("add-subject-btn").addEventListener("click", () => {
+    const input = $("custom-subject");
+    const name = input.value.trim().replace(/\\s+/g, " ");
+    if (!name) return;
+    if (!SUBJECTS.some(s => s.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      SUBJECTS.push(name);
+      const option = document.createElement("option"); option.value = name; option.textContent = name;
+      $("subject-select").appendChild(option);
+    }
+    $("subject-select").value = SUBJECTS.find(s => s.toLocaleLowerCase() === name.toLocaleLowerCase());
+    input.value = "";
+    $("subject-hint").textContent = `Выбрано направление: ${$("subject-select").value}`;
+    renderSubjectStats();
+  });
+  $("leaderboard-topic")?.addEventListener("change", renderLeaderboard);
+  $("leaderboard-period")?.addEventListener("change", renderLeaderboard);
   $("start-btn").addEventListener("click", start);
   $("finish-btn").addEventListener("click", finish);
   $("subject-select").addEventListener("change", () => {
@@ -134,4 +206,5 @@
     }
   });
   render();
+  syncFromServer();
 })();
